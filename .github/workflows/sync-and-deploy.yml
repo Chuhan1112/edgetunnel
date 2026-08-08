@@ -1,0 +1,43 @@
+name: Upstream Sync & Deploy
+
+permissions:
+  contents: write
+
+on:
+  schedule:
+    - cron: "0 0 * * *"   # 每天 UTC 00:00 自动同步上游
+  workflow_dispatch:       # 支持手动触发
+
+jobs:
+  sync_and_deploy:
+    name: Sync upstream and deploy to Cloudflare Pages
+    runs-on: ubuntu-latest
+    if: ${{ github.event.repository.fork }}
+
+    steps:
+      - name: Checkout target repo
+        uses: actions/checkout@v4
+
+      - name: Sync upstream changes
+        id: sync
+        uses: aormsby/fork-sync-with-upstream-action@v3.4.3
+        with:
+          upstream_sync_repo: cmliu/edgetunnel
+          upstream_sync_branch: main
+          target_sync_branch: main
+          target_repo_token: ${{ secrets.GITHUB_TOKEN }}
+          test_mode: false
+
+      - name: Deploy to Cloudflare Pages (steve)
+        if: steps.sync.outputs.has_synced_changes == 'true' || github.event_name == 'workflow_dispatch'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: pages deploy . --project-name=steve
+
+      - name: Notify on sync failure
+        if: failure()
+        run: |
+          echo "[Error] 上游同步或部署失败，请手动检查"
+          exit 1
