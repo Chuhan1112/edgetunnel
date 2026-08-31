@@ -409,7 +409,7 @@ export default {
 							const ECHLINK参数 = config_JSON.ECH ? `&ech=${encodeURIComponent((config_JSON.ECHConfig.SNI ? config_JSON.ECHConfig.SNI + '+' : '') + config_JSON.ECHConfig.DNS)}` : '';
 							const isLoonOrSurge = ua.includes('loon') || ua.includes('surge');
 							const { type: 传输协议, 路径字段名, 域名字段名 } = 获取传输协议配置(config_JSON);
-							完整优选IP = await 附加IP地域标记(env, 完整优选IP);
+							完整优选IP = await 附加机房地域标记(request, env, 完整优选IP);
 							订阅内容 = 其他节点LINK + 完整优选IP.map(原始地址 => {
 								// 统一正则: 匹配 域名/IPv4/IPv6地址 + 可选端口 + 可选备注
 								// 示例:
@@ -5903,59 +5903,130 @@ async function 生成随机IP(request, count = 16, 指定端口 = -1) {
 	return [randomIPs, randomIPs.join('\n')];
 }
 
+const Cloudflare机房国家表 = {
+	AAE: 'DZ', ABJ: 'CI', ABQ: 'US', ACC: 'GH', ACX: 'CN', ADB: 'TR', ADD: 'ET', ADL: 'AU',
+	AGR: 'IN', AIP: 'IN', AKL: 'NZ', AKX: 'KZ', ALA: 'KZ', ALG: 'DZ', AMD: 'IN', AMM: 'JO',
+	AMS: 'NL', ANC: 'US', ARI: 'CL', ARU: 'BR', ASK: 'CI', ASU: 'PY', ATH: 'GR',
+	ATL: 'US', AUS: 'US', AVA: 'CN', BAH: 'BH', BAQ: 'CO', BBI: 'IN', BCN: 'ES', BDQ: 'IN',
+	BEG: 'RS', BEL: 'BR', BEY: 'LB', BGI: 'BB', BGR: 'US', BGW: 'IQ', BHY: 'CN', BKK: 'TH',
+	BLR: 'IN', BNA: 'US', BNE: 'AU', BNU: 'BR', BOD: 'FR', BOG: 'CO', BOM: 'IN', BOS: 'US',
+	BRU: 'BE', BSB: 'BR', BSR: 'IQ', BTS: 'SK', BUD: 'HU', BUF: 'US', BWN: 'BN', CAI: 'EG',
+	CAN: 'CN', CAW: 'BR', CBR: 'AU', CCP: 'CL', CCU: 'IN', CDG: 'FR', CEB: 'PH', CFC: 'BR',
+	CGB: 'BR', CGD: 'CN', CGK: 'ID', CGO: 'CN', CGP: 'BD', CGY: 'PH', CHC: 'NZ', CJB: 'IN',
+	CKG: 'CN', CLE: 'US', CLO: 'CO', CLT: 'US', CMB: 'LK', CMH: 'US', CNF: 'BR', CNN: 'IN',
+	CNX: 'TH', COK: 'IN', COR: 'AR', CPH: 'DK', CPT: 'ZA', CRK: 'PH', CSX: 'CN', CTU: 'CN',
+	CVG: 'US', CWB: 'BR', CZL: 'DZ', CZX: 'CN', DAC: 'BD', DAD: 'VN', DAR: 'TZ', DEL: 'IN',
+	DEN: 'US', DFW: 'US', DKR: 'SN', DLA: 'CM', DLC: 'CN', DME: 'RU', DMM: 'SA', DOH: 'QA',
+	DPS: 'ID', DTW: 'US', DUB: 'IE', DUR: 'ZA', DUS: 'DE', DXB: 'AE', EBB: 'UG', EBL: 'IQ',
+	EDI: 'GB', EVN: 'AM', EWR: 'US', EZE: 'AR', FCO: 'IT', FIH: 'CD', FLN: 'BR', FOC: 'CN',
+	FOR: 'BR', FRA: 'DE', FRU: 'KG', FSD: 'US', FUK: 'JP', FUO: 'CN', GBE: 'BW', GDL: 'MX',
+	GEO: 'GY', GIG: 'BR', GND: 'GD', GOT: 'SE', GRU: 'BR', GUA: 'GT', GUM: 'GU', GVA: 'CH',
+	GYD: 'AZ', GYE: 'EC', GYN: 'BR', HAK: 'CN', HAM: 'DE', HAN: 'VN', HBA: 'AU', HEL: 'FI',
+	HFA: 'IL', HFE: 'CN', HGH: 'CN', HKG: 'HK', HNL: 'US', HRE: 'ZW', HYD: 'IN', HYN: 'CN',
+	IAD: 'US', IAH: 'US', ICN: 'KR', IND: 'US', ISB: 'PK', IST: 'TR', ISU: 'IQ', ITJ: 'BR',
+	IXC: 'IN', JAX: 'US', JDO: 'BR', JED: 'SA', JHB: 'MY', JIB: 'DJ', JNB: 'ZA', JOG: 'ID',
+	JOI: 'BR', JRG: 'IN', JSR: 'BD', JXG: 'CN', KBP: 'UA', KCH: 'MY', KEF: 'IS', KGL: 'RW',
+	KHH: 'TW', KHI: 'PK', KHN: 'CN', KIN: 'JM', KIV: 'MD', KIX: 'JP', KJA: 'RU', KMG: 'CN',
+	KNU: 'IN', KTM: 'NP', KUL: 'MY', KWE: 'CN', KWI: 'KW', LAD: 'AO', LAS: 'US', LAX: 'US',
+	LCA: 'CY', LED: 'RU', LHE: 'PK', LHR: 'GB', LHW: 'CN', LIM: 'PE', LIS: 'PT', LJU: 'SI',
+	LLK: 'AZ', LLW: 'MW', LOS: 'NG', LPB: 'BO', LUN: 'ZM', LUX: 'LU', LYA: 'CN',
+	LYS: 'FR', MAA: 'IN', MAD: 'ES', MAN: 'GB', MAO: 'BR', MBA: 'KE', MCI: 'US', MCT: 'OM',
+	MDE: 'CO', MEL: 'AU', MEM: 'US', MEX: 'MX', MFE: 'US', MFM: 'MO', MIA: 'US', MLA: 'MT',
+	MLE: 'MV', MLG: 'ID', MNL: 'PH', MPM: 'MZ', MRS: 'FR', MRU: 'MU', MSP: 'US', MSQ: 'BY',
+	MUC: 'DE', MXP: 'IT', NAG: 'IN', NBO: 'KE', NJF: 'IQ', NNG: 'CN', NOU: 'NC', NQN: 'AR',
+	NQZ: 'KZ', NRT: 'JP', NVT: 'BR', OKA: 'JP', OKC: 'US', OMA: 'US', ORD: 'US', ORF: 'US',
+	ORK: 'IE', ORN: 'DZ', OSL: 'NO', OTP: 'RO', OUA: 'BF', PAT: 'IN', PBH: 'BT', PBM: 'SR',
+	PDX: 'US', PER: 'AU', PHL: 'US', PHX: 'US', PIT: 'US', PKX: 'CN', PMO: 'IT', PMW: 'BR',
+	PNH: 'KH', PNQ: 'IN', POA: 'BR', POS: 'TT', PPT: 'PF', PRG: 'CZ', PTY: 'PA', QRO: 'MX',
+	QWJ: 'BR', RAO: 'BR', RDU: 'US', REC: 'BR', RIC: 'US', RIX: 'LV', RUH: 'SA', RUN: 'RE',
+	SAN: 'US', SAP: 'HN', SAT: 'US', SCL: 'CL', SDQ: 'DO', SEA: 'US', SFO: 'US', SGN: 'VN',
+	SHA: 'CN', SIN: 'SG', SJC: 'US', SJK: 'BR', SJO: 'CR', SJP: 'BR', SJU: 'PR', SJW: 'CN',
+	SKG: 'GR', SKP: 'MK', SLC: 'US', SMF: 'US', SOD: 'BR', SOF: 'BG', SSA: 'BR', STI: 'DO',
+	STL: 'US', STR: 'DE', SUV: 'FJ', SVX: 'RU', SYD: 'AU', SZX: 'CN', TAO: 'CN', TAS: 'UZ',
+	TBS: 'GE', TEN: 'CN', TGU: 'HN', TIA: 'AL', TLH: 'US', TLL: 'EE', TLV: 'IL', TNA: 'CN',
+	TNR: 'MG', TPA: 'US', TPE: 'TW', TSN: 'CN', TUN: 'TN', TXL: 'DE', TYN: 'CN', UDI: 'BR',
+	UDR: 'IN', UIO: 'EC', ULN: 'MN', URT: 'TH', VCP: 'BR', VIE: 'AT', VIX: 'BR', VNO: 'LT',
+	VTE: 'LA', WAW: 'PL', WDH: 'NA', WHU: 'CN', WLG: 'NZ', WRO: 'PL', XAP: 'BR', XFN: 'CN',
+	XIY: 'CN', XNH: 'IQ', XNN: 'CN', YHZ: 'CA', YOW: 'CA', YUL: 'CA', YVR: 'CA', YWG: 'CA',
+	YXE: 'CA', YYC: 'CA', YYZ: 'CA', ZAG: 'HR', ZDM: 'PS', ZGN: 'CN', ZRH: 'CH'
+};
+
 function 国家代码转国旗(countryCode) {
 	const code = String(countryCode || '').toUpperCase();
 	if (!/^[A-Z]{2}$/.test(code)) return '';
 	return [...code].map(char => String.fromCodePoint(0x1f1e6 + char.charCodeAt(0) - 65)).join('');
 }
 
-async function 获取IP地域标记(env, 原始地址) {
-	const ip = String(原始地址 || '').replace(/^\[|\]$/g, '');
-	if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(ip) && !/^[\da-fA-F:]+$/.test(ip)) return '🌐';
-	const cacheKey = `geo_flag_v4:${ip}`;
+async function 通过TCP探测机房(request, 主机) {
+	const 连接器 = 创建请求TCP连接器(request);
+	const socket = 连接器({ hostname: 主机, port: 80 });
+	let reader = null;
 	try {
-		const cachedFlag = await env.KV?.get(cacheKey);
-		if (cachedFlag) return cachedFlag;
-	} catch (error) {}
+		const writer = socket.writable.getWriter();
+		await writer.write(new TextEncoder().encode('GET /cdn-cgi/trace HTTP/1.1\r\nHost: speed.cloudflare.com\r\nUser-Agent: edgetunnel-machine-region\r\nConnection: close\r\n\r\n'));
+		writer.releaseLock();
+		reader = socket.readable.getReader();
+		const decoder = new TextDecoder();
+		let responseText = '';
+		for (let index = 0; index < 8; index++) {
+			const { done, value } = await reader.read();
+			if (done) break;
+			responseText += decoder.decode(value, { stream: true });
+			const coloMatch = responseText.match(/^colo=([A-Z0-9]{3})$/m);
+			if (coloMatch) return coloMatch[1];
+		}
+		return null;
+	} finally {
+		try { reader?.releaseLock() } catch (error) { }
+		try { socket.close() } catch (error) { }
+	}
+}
+
+async function 获取机房标记(request, env, 原始地址) {
+	const 地址部分 = 原始地址.split('#')[0];
+	const 主机匹配 = 地址部分.match(/^(\[[^\]]+\]|[^:]+)/);
+	if (!主机匹配) return '🌐';
+	const 主机 = 主机匹配[1].replace(/^\[|\]$/g, '').toLowerCase();
+	if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(主机) && !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/.test(主机)) return '🌐';
+	const cacheKey = `machine_region_v2:${主机}`;
+	try {
+		const cachedRegion = await env.KV?.get(cacheKey);
+		if (cachedRegion === 'UNKNOWN') return '🌐';
+		if (cachedRegion) return 国家代码转国旗(cachedRegion) || '🌐';
+	} catch (error) { }
 
 	try {
-		const response = await withTimeout(fetch(`https://ipwho.is/${ip}`), 5000, 'IP地域查询超时');
-		const data = await response.json();
-		const flag = 国家代码转国旗(data?.country_code);
-		if (flag) {
-			try {
-				await env.KV?.put(cacheKey, flag, { expirationTtl: 86400 });
-			} catch (error) {}
-			return flag;
+		const colo = await withTimeout(通过TCP探测机房(request, 主机), 2500, '机房探测超时');
+		const countryCode = colo ? Cloudflare机房国家表[colo] : '';
+		if (countryCode && countryCode !== 'null') {
+			try { await env.KV?.put(cacheKey, countryCode, { expirationTtl: 86400 }) } catch (error) { }
+			return 国家代码转国旗(countryCode);
 		}
-	} catch (error) {}
-
-	try {
-		const response = await withTimeout(fetch(`https://ipinfo.io/${ip}/json`), 5000, 'IP地域查询超时');
-		const data = await response.json();
-		const flag = 国家代码转国旗(data?.country);
-		if (flag) {
-			try {
-				await env.KV?.put(cacheKey, flag, { expirationTtl: 86400 });
-			} catch (error) {}
-			return flag;
-		}
-	} catch (error) {}
+		try { await env.KV?.put(cacheKey, 'UNKNOWN', { expirationTtl: 600 }) } catch (error) { }
+	} catch (error) {
+		try { await env.KV?.put(cacheKey, 'UNKNOWN', { expirationTtl: 600 }) } catch (error) { }
+	}
 	return '🌐';
 }
 
-async function 附加IP地域标记(env, 地址列表 = []) {
-	return Promise.all(地址列表.map(async 原始地址 => {
-		const 备注位置 = 原始地址.indexOf('#');
-		const 地址部分 = 备注位置 === -1 ? 原始地址 : 原始地址.slice(0, 备注位置);
-		const 备注部分 = 备注位置 === -1 ? '' : 原始地址.slice(备注位置 + 1);
-		const 主机匹配 = 地址部分.match(/^(\[[^\]]+\]|[^:]+)(?::\d+)?$/);
-		const 查询地址 = 主机匹配 ? 主机匹配[1] : 地址部分;
-		const flag = await 获取IP地域标记(env, 查询地址);
-		const currentRemark = decodeURIComponent(备注部分 || '');
-		if (currentRemark.startsWith(flag)) return 原始地址;
-		return 备注位置 === -1 ? `${地址部分}#${flag}` : `${地址部分}#${flag} ${currentRemark}`;
-	}));
+async function 附加机房地域标记(request, env, 地址列表 = []) {
+	const 批量大小 = 8;
+	for (let index = 0; index < 地址列表.length; index += 批量大小) {
+		const 批量范围 = [index, Math.min(index + 批量大小, 地址列表.length)];
+		const 批量标记 = await Promise.all(地址列表.slice(...批量范围).map(原始地址 => 获取机房标记(request, env, 原始地址)));
+		地址列表.splice(批量范围[0], 批量范围[1] - 批量范围[0], ...地址列表.slice(...批量范围).map((原始地址, offset) => {
+			const 备注位置 = 原始地址.indexOf('#');
+			const 地址部分 = 备注位置 === -1 ? 原始地址 : 原始地址.slice(0, 备注位置);
+			let 当前备注 = '';
+			if (备注位置 !== -1) {
+				try { 当前备注 = decodeURIComponent(原始地址.slice(备注位置 + 1)) } catch (error) { 当前备注 = 原始地址.slice(备注位置 + 1) }
+			}
+			const 标记 = 批量标记[offset];
+			if (当前备注.startsWith(标记)) return 原始地址;
+			return `${地址部分}#${标记}${当前备注 ? ` ${当前备注}` : ''}`;
+		}));
+	}
+	return 地址列表;
 }
 
 async function 整理成数组(内容) {
