@@ -1,62 +1,16 @@
 diff --git a/_worker.js b/_worker.js
-index 8df2a88..def0d91 100644
+index c26dd36..ad52497 100644
 --- a/_worker.js
 +++ b/_worker.js
-@@ -400,6 +400,7 @@ export default {
- 							const ECHLINK参数 = config_JSON.ECH ? `&ech=${encodeURIComponent((config_JSON.ECHConfig.SNI ? config_JSON.ECHConfig.SNI + '+' : '') + config_JSON.ECHConfig.DNS)}` : '';
- 							const isLoonOrSurge = ua.includes('loon') || ua.includes('surge');
- 							const { type: 传输协议, 路径字段名, 域名字段名 } = 获取传输协议配置(config_JSON);
-+							完整优选IP = await 附加IP地域标记(env, 完整优选IP);
- 							订阅内容 = 其他节点LINK + 完整优选IP.map(原始地址 => {
- 								// 统一正则: 匹配 域名/IPv4/IPv6地址 + 可选端口 + 可选备注
- 								// 示例:
-@@ -5713,6 +5714,49 @@ async function 生成随机IP(request, count = 16, 指定端口 = -1) {
- 	return [randomIPs, randomIPs.join('\n')];
- }
+@@ -5910,8 +5910,10 @@ async function 获取IP地域标记(env, 原始地址) {
+ 	} catch (error) {}
  
-+function 国家代码转国旗(countryCode) {
-+	const code = String(countryCode || '').toUpperCase();
-+	if (!/^[A-Z]{2}$/.test(code)) return '';
-+	return [...code].map(char => String.fromCodePoint(0x1f1e6 + char.charCodeAt(0) - 65)).join('');
-+}
-+
-+async function 获取IP地域标记(env, 原始地址) {
-+	const ip = String(原始地址 || '').replace(/^\[|\]$/g, '');
-+	if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(ip) && !/^[\da-fA-F:]+$/.test(ip)) return '🌐';
-+	const cacheKey = `geo_flag_v3:${ip}`;
-+	try {
-+		const cachedFlag = await env.KV?.get(cacheKey);
-+		if (cachedFlag) return cachedFlag;
-+	} catch (error) {}
-+
-+	try {
-+		const response = await withTimeout(fetch(`http://ip-api.com/json/${ip}?fields=status,countryCode`), 5000, 'IP地域查询超时');
-+		const data = await response.json();
-+		const flag = 国家代码转国旗(data?.countryCode);
-+		if (flag) {
-+			try {
-+				await env.KV?.put(cacheKey, flag, { expirationTtl: 86400 });
-+			} catch (error) {}
-+			return flag;
-+		}
-+	} catch (error) {}
-+	return '🌐';
-+}
-+
-+async function 附加IP地域标记(env, 地址列表 = []) {
-+	return Promise.all(地址列表.map(async 原始地址 => {
-+		const 备注位置 = 原始地址.indexOf('#');
-+		const 地址部分 = 备注位置 === -1 ? 原始地址 : 原始地址.slice(0, 备注位置);
-+		const 备注部分 = 备注位置 === -1 ? '' : 原始地址.slice(备注位置 + 1);
-+		const 主机匹配 = 地址部分.match(/^(\[[^\]]+\]|[^:]+)(?::\d+)?$/);
-+		const 查询地址 = 主机匹配 ? 主机匹配[1] : 地址部分;
-+		const flag = await 获取IP地域标记(env, 查询地址);
-+		const currentRemark = decodeURIComponent(备注部分 || '');
-+		if (currentRemark.startsWith(flag)) return 原始地址;
-+		return 备注位置 === -1 ? `${地址部分}#${flag}` : `${地址部分}#${flag} ${currentRemark}`;
-+	}));
-+}
-+
- async function 整理成数组(内容) {
- 	var 替换后的内容 = 内容.replace(/[	"'\r\n]+/g, ',').replace(/,+/g, ',');
- 	if (替换后的内容.charAt(0) == ',') 替换后的内容 = 替换后的内容.slice(1);
+ 	try {
+-		const response = await withTimeout(fetch(`http://ip-api.com/json/${ip}?fields=status,countryCode`), 5000, 'IP地域查询超时');
++		const response = await withTimeout(fetch(`http://ip-api.com/json/${ip}?fields=status,countryCode,isp,org,as`), 5000, 'IP地域查询超时');
+ 		const data = await response.json();
++		const isCloudflare = [data?.isp, data?.org, data?.as].some(value => String(value || '').toLowerCase().includes('cloudflare'));
++		if (isCloudflare) return '🌐';
+ 		const flag = 国家代码转国旗(data?.countryCode);
+ 		if (flag) {
+ 			try {

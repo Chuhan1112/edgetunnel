@@ -5910,8 +5910,10 @@ async function 获取IP地域标记(env, 原始地址) {
 	} catch (error) {}
 
 	try {
-		const response = await withTimeout(fetch(`http://ip-api.com/json/${ip}?fields=status,countryCode`), 5000, 'IP地域查询超时');
+		const response = await withTimeout(fetch(`http://ip-api.com/json/${ip}?fields=status,countryCode,isp,org,as`), 5000, 'IP地域查询超时');
 		const data = await response.json();
+		const isCloudflare = [data?.isp, data?.org, data?.as].some(value => String(value || '').toLowerCase().includes('cloudflare'));
+		if (isCloudflare) return '🌐';
 		const flag = 国家代码转国旗(data?.countryCode);
 		if (flag) {
 			try {
