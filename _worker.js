@@ -5903,18 +5903,28 @@ function 国家代码转国旗(countryCode) {
 async function 获取IP地域标记(env, 原始地址) {
 	const ip = String(原始地址 || '').replace(/^\[|\]$/g, '');
 	if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(ip) && !/^[\da-fA-F:]+$/.test(ip)) return '🌐';
-	const cacheKey = `geo_flag_v3:${ip}`;
+	const cacheKey = `geo_flag_v4:${ip}`;
 	try {
 		const cachedFlag = await env.KV?.get(cacheKey);
 		if (cachedFlag) return cachedFlag;
 	} catch (error) {}
 
 	try {
-		const response = await withTimeout(fetch(`http://ip-api.com/json/${ip}?fields=status,countryCode,isp,org,as`), 5000, 'IP地域查询超时');
+		const response = await withTimeout(fetch(`https://ipwho.is/${ip}`), 5000, 'IP地域查询超时');
 		const data = await response.json();
-		const isCloudflare = [data?.isp, data?.org, data?.as].some(value => String(value || '').toLowerCase().includes('cloudflare'));
-		if (isCloudflare) return '🌐';
-		const flag = 国家代码转国旗(data?.countryCode);
+		const flag = 国家代码转国旗(data?.country_code);
+		if (flag) {
+			try {
+				await env.KV?.put(cacheKey, flag, { expirationTtl: 86400 });
+			} catch (error) {}
+			return flag;
+		}
+	} catch (error) {}
+
+	try {
+		const response = await withTimeout(fetch(`https://ipinfo.io/${ip}/json`), 5000, 'IP地域查询超时');
+		const data = await response.json();
+		const flag = 国家代码转国旗(data?.country);
 		if (flag) {
 			try {
 				await env.KV?.put(cacheKey, flag, { expirationTtl: 86400 });
