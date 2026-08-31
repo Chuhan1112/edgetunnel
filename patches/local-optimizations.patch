@@ -1,38 +1,20 @@
 diff --git a/_worker.js b/_worker.js
-index ad52497..40cdb79 100644
+index 40cdb79..0e3451b 100644
 --- a/_worker.js
 +++ b/_worker.js
-@@ -5903,18 +5903,28 @@ function 国家代码转国旗(countryCode) {
- async function 获取IP地域标记(env, 原始地址) {
- 	const ip = String(原始地址 || '').replace(/^\[|\]$/g, '');
- 	if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(ip) && !/^[\da-fA-F:]+$/.test(ip)) return '🌐';
--	const cacheKey = `geo_flag_v3:${ip}`;
-+	const cacheKey = `geo_flag_v4:${ip}`;
- 	try {
- 		const cachedFlag = await env.KV?.get(cacheKey);
- 		if (cachedFlag) return cachedFlag;
- 	} catch (error) {}
- 
- 	try {
--		const response = await withTimeout(fetch(`http://ip-api.com/json/${ip}?fields=status,countryCode,isp,org,as`), 5000, 'IP地域查询超时');
-+		const response = await withTimeout(fetch(`https://ipwho.is/${ip}`), 5000, 'IP地域查询超时');
- 		const data = await response.json();
--		const isCloudflare = [data?.isp, data?.org, data?.as].some(value => String(value || '').toLowerCase().includes('cloudflare'));
--		if (isCloudflare) return '🌐';
--		const flag = 国家代码转国旗(data?.countryCode);
-+		const flag = 国家代码转国旗(data?.country_code);
-+		if (flag) {
-+			try {
-+				await env.KV?.put(cacheKey, flag, { expirationTtl: 86400 });
-+			} catch (error) {}
-+			return flag;
+@@ -51,6 +51,15 @@ export default {
+ 			if (env.GO2SOCKS5) SOCKS5白名单 = [...new Set(SOCKS5白名单.concat(await 整理成数组(env.GO2SOCKS5)))];
+ 			缓存SOCKS5白名单 = SOCKS5白名单;
+ 		} else SOCKS5白名单 = 缓存SOCKS5白名单;
++		if (访问路径 === 'colo') {// 边缘机房诊断
++			return new Response(JSON.stringify({
++				edge_colo: request.cf?.colo || null,
++				client_country: request.cf?.country || null,
++				client_city: request.cf?.city || null,
++				client_asn: request.cf?.asn || null,
++				client_asOrganization: request.cf?.asOrganization || null
++			}, null, 2), { status: 200, headers: { 'Content-Type': 'application/json;charset=utf-8', 'Cache-Control': 'no-store' } });
 +		}
-+	} catch (error) {}
-+
-+	try {
-+		const response = await withTimeout(fetch(`https://ipinfo.io/${ip}/json`), 5000, 'IP地域查询超时');
-+		const data = await response.json();
-+		const flag = 国家代码转国旗(data?.country);
- 		if (flag) {
- 			try {
- 				await env.KV?.put(cacheKey, flag, { expirationTtl: 86400 });
+ 		if (访问路径 === 'version') {// 版本信息接口
+ 			const 请求UUID = (url.searchParams.get('uuid') || '').toLowerCase();
+ 			if (uuidRegex.test(请求UUID)) {

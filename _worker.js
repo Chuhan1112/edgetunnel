@@ -51,6 +51,15 @@ export default {
 			if (env.GO2SOCKS5) SOCKS5白名单 = [...new Set(SOCKS5白名单.concat(await 整理成数组(env.GO2SOCKS5)))];
 			缓存SOCKS5白名单 = SOCKS5白名单;
 		} else SOCKS5白名单 = 缓存SOCKS5白名单;
+		if (访问路径 === 'colo') {// 边缘机房诊断
+			return new Response(JSON.stringify({
+				edge_colo: request.cf?.colo || null,
+				client_country: request.cf?.country || null,
+				client_city: request.cf?.city || null,
+				client_asn: request.cf?.asn || null,
+				client_asOrganization: request.cf?.asOrganization || null
+			}, null, 2), { status: 200, headers: { 'Content-Type': 'application/json;charset=utf-8', 'Cache-Control': 'no-store' } });
+		}
 		if (访问路径 === 'version') {// 版本信息接口
 			const 请求UUID = (url.searchParams.get('uuid') || '').toLowerCase();
 			if (uuidRegex.test(请求UUID)) {
