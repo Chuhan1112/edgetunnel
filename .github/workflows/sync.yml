@@ -1,4 +1,4 @@
-name: Upstream Sync
+name: Upstream Sync & Deploy
 
 permissions:
   contents: write
@@ -7,6 +7,8 @@ on:
   schedule:
     - cron: "0 0 * * *" # every day
   workflow_dispatch:
+  push:
+    branches: [main]
 
 jobs:
   sync_latest_from_upstream:
@@ -42,3 +44,17 @@ jobs:
             fi
             git push origin main
           fi
+
+      - name: Restore local optimizations
+        run: |
+          if ! grep -q "附加IP地域标记" _worker.js; then
+            git apply patches/local-optimizations.patch
+          fi
+          node --check _worker.js
+
+      - name: Deploy to Cloudflare Pages (steve)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: pages deploy . --project-name=steve
